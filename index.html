@@ -1059,20 +1059,24 @@
         function renderSimMatchesView(container) {
             let matches = window.globalMatchesData || [];
 
-            // 1. Filtrar solo los NO finalizados y con equipos definidos
+            // 1. Filtrar solo los NO finalizados, con equipos definidos y que sean solo de Fase de Grupos
             let activeMatches = matches.filter(m => {
                 let homeId = m.home_team_id || m.homeTeamId || m.home_team;
                 let awayId = m.away_team_id || m.awayTeamId || m.away_team;
                 let isFinished = String(m.finished).toUpperCase() === 'TRUE';
+                
+                let stage = (m.group || m.stage || '').toString().toUpperCase();
+                let isKnockout = stage === 'R32' || stage === 'R16' || stage === 'QF' || stage === 'SF' || stage.includes('FINAL') || stage.includes('ROUND');
 
-                return !isFinished && homeId && awayId && String(homeId) !== "0" && String(awayId) !== "0";
+                return !isFinished && !isKnockout && homeId && awayId && String(homeId) !== "0" && String(awayId) !== "0";
             });
 
             // 2. Agrupar por fase/grupo
             let grouped = {};
             activeMatches.forEach(m => {
                 let stageName = m.group || m.stage || 'Fase de Grupos';
-                // Mejorar nomenclatura si la API usa códigos
+                // Ya no debería haber R32, R16, etc. porque los filtramos arriba, 
+                // pero dejamos la lógica por si acaso:
                 if (stageName.toUpperCase() === 'R16') stageName = 'Octavos de Final';
                 if (stageName.toUpperCase() === 'R32') stageName = 'Dieciseisavos de Final';
                 if (stageName.toUpperCase() === 'QF') stageName = 'Cuartos de Final';
