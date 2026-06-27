@@ -1336,8 +1336,17 @@
 
         function renderLiveView(container) {
             container.innerHTML = `
-                <div style="width: 100%; height: calc(100vh - 150px); min-height: 600px; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 15px 35px rgba(0,0,0,0.5);">
-                    <iframe allowfullscreen="true" scrolling="no" src="https://futbol-libres.su/eventos.html?r=aHR0cHM6Ly9sYXRhbXZpZHpzLm9yZy9jYW5hbC5waHA/c3RyZWFtPXRlbGVtdW5kb3VzYQ==" allow="encrypted-media" width="100%" height="100%" frameborder="0"></iframe>
+                <div style="width: 100%; display: flex; flex-direction: column; gap: 15px;">
+                    <div style="background: rgba(249, 115, 22, 0.1); border-left: 4px solid rgba(249, 115, 22, 0.8); padding: 12px 20px; border-radius: 6px; color: var(--text-muted); font-size: 0.95rem; display: flex; align-items: center; gap: 10px; animation: fadeIn 0.5s ease-out;">
+                        <img src="https://imgs.search.brave.com/18GdBLSWASFlpsux6I0x-TWIDmX8zCeX2U-WPA4ecjY/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly91eHdp/bmcuY29tL3dwLWNv/bnRlbnQvdGhlbWVz/L3V4d2luZy9kb3du/bG9hZC9icmFuZHMt/YW5kLXNvY2lhbC1t/ZWRpYS9icmF2ZS1i/cm93c2VyLWljb24u/cG5n" alt="Brave Browser" style="width: 24px; height: 24px; filter: drop-shadow(0 2px 4px rgba(249, 115, 22, 0.3));" />
+                        <span><strong>Consejo:</strong> Te recomendamos usar <a href="https://brave.com/es/" target="_blank" rel="noopener noreferrer" style="color: #f97316; font-weight: bold; text-decoration: none; border-bottom: 1px dashed #f97316; transition: color 0.2s;" onmouseover="this.style.color='#fff'; this.style.borderBottomColor='#fff'" onmouseout="this.style.color='#f97316'; this.style.borderBottomColor='#f97316'">Brave Browser</a> para ver la transmisión en vivo. Así evitarás los molestos anuncios y pop-ups.</span>
+                    </div>
+                    <div style="width: 100%; height: calc(100vh - 200px); min-height: 600px; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 15px 35px rgba(0,0,0,0.5);">
+                        <iframe allowfullscreen="true" scrolling="no" src="https://telelibree.com/en-vivo/telemundo/embed2.php" allow="encrypted-media" width="100%" height="100%" frameborder="0"></iframe>
+                    </div>
+                    <div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding-top: 5px; opacity: 0.7;">
+                        <strong>Aviso Legal:</strong> La transmisión de los partidos es proporcionada por un servicio de terceros (telelibree.com). Zona Cascarita no aloja, controla ni se hace responsable del contenido de dicha transmisión.
+                    </div>
                 </div>
             `;
         }
