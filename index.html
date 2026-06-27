@@ -936,6 +936,7 @@
                     .then(r => r.json())
                     .then(data => {
                         let matchArr = data.games || data.matches || data.data || [];
+                        window.globalH2HPoints = {}; // Almacenar H2H de partidos reales
                         matchArr.forEach(m => {
                             let homeId = m.home_team_id || m.homeTeamId || m.home_team;
                             let awayId = m.away_team_id || m.awayTeamId || m.away_team;
@@ -946,6 +947,23 @@
                             if (awayId) {
                                 if (!matchesMap.has(awayId.toString())) matchesMap.set(awayId.toString(), []);
                                 matchesMap.get(awayId.toString()).push(m);
+                            }
+
+                            if (String(m.finished).toUpperCase() === 'TRUE') {
+                                let hId = (homeId || '').toString();
+                                let aId = (awayId || '').toString();
+                                let hScore = parseInt(m.home_score);
+                                let aScore = parseInt(m.away_score);
+                                if (!isNaN(hScore) && !isNaN(aScore) && hId && aId) {
+                                    if (hScore > aScore) {
+                                        window.globalH2HPoints[`${hId}_${aId}`] = (window.globalH2HPoints[`${hId}_${aId}`] || 0) + 3;
+                                    } else if (aScore > hScore) {
+                                        window.globalH2HPoints[`${aId}_${hId}`] = (window.globalH2HPoints[`${aId}_${hId}`] || 0) + 3;
+                                    } else {
+                                        window.globalH2HPoints[`${hId}_${aId}`] = (window.globalH2HPoints[`${hId}_${aId}`] || 0) + 1;
+                                        window.globalH2HPoints[`${aId}_${hId}`] = (window.globalH2HPoints[`${aId}_${hId}`] || 0) + 1;
+                                    }
+                                }
                             }
                         });
                         window.globalMatchesData = matchArr;
@@ -1239,21 +1257,21 @@
                 }
             });
 
-            // Ordenar: Pts > Enfrentamiento Directo > GD > GF
+            // Ordenar bajo reglas FIFA: Pts > Enfrentamiento Directo > GD > GF
             let resultGroups = [];
             simGroupsMap.forEach((teams, groupName) => {
                 teams.sort((a, b) => {
                     if (b.pts !== a.pts) return b.pts - a.pts; // 1. Puntos
 
-                    // 2. Enfrentamiento directo
-                    let aVsB = a.h2h_pts[b.team_id] || 0;
-                    let bVsA = b.h2h_pts[a.team_id] || 0;
-                    if (aVsB !== bVsA) return bVsA - aVsB;
+                    // 2. Enfrentamiento directo (H2H)
+                    let aVsB = a.h2h_pts[b.team_id || b.id] || 0;
+                    let bVsA = b.h2h_pts[a.team_id || a.id] || 0;
+                    if (bVsA !== aVsB) return bVsA - aVsB;
 
-                    // 3. Diferencia de Goles
+                    // 3. Diferencia de Goles (GD)
                     if (b.gd !== a.gd) return b.gd - a.gd;
 
-                    // 4. Goles a favor
+                    // 4. Goles a favor (GF)
                     return b.gf - a.gf;
                 });
                 resultGroups.push({ group: groupName, teams: teams });
@@ -1433,7 +1451,22 @@
             let allMatches = window.globalMatchesData || [];
             cacheGroups.forEach((groupBlock, i) => {
                 const groupName = groupBlock.group || groupBlock.name || '—';
-                const sortedTeams = [...(groupBlock.teams || [])].sort((a, b) => parseInt(b.pts) - parseInt(a.pts) || parseInt(b.gd) - parseInt(a.gd));
+                const sortedTeams = [...(groupBlock.teams || [])].sort((a, b) => {
+                    let aPts = parseInt(a.pts || 0); let bPts = parseInt(b.pts || 0);
+                    if (bPts !== aPts) return bPts - aPts; // 1. Puntos
+
+                    let tIdA = (a.team_id || a.id || '').toString();
+                    let tIdB = (b.team_id || b.id || '').toString();
+                    let aVsB = (window.globalH2HPoints && window.globalH2HPoints[`${tIdA}_${tIdB}`]) ? window.globalH2HPoints[`${tIdA}_${tIdB}`] : 0;
+                    let bVsA = (window.globalH2HPoints && window.globalH2HPoints[`${tIdB}_${tIdA}`]) ? window.globalH2HPoints[`${tIdB}_${tIdA}`] : 0;
+                    if (bVsA !== aVsB) return bVsA - aVsB; // 2. Enfrentamiento Directo
+
+                    let aGd = parseInt(a.gd || 0); let bGd = parseInt(b.gd || 0);
+                    if (bGd !== aGd) return bGd - aGd; // 3. Diferencia de Goles
+
+                    let aGf = parseInt(a.gf || 0); let bGf = parseInt(b.gf || 0);
+                    return bGf - aGf; // 4. Goles a favor
+                });
 
                 let groupTeamIds = (groupBlock.teams || []).map(t => t.team_id?.toString());
                 let groupMatches = allMatches.filter(m => {
@@ -1625,9 +1658,27 @@
 
             groupsData.forEach(g => {
                 if (g.teams && g.teams.length >= 3) {
-                    // Ordenar equipos del grupo para sacar el 3er lugar
-                    const sortedTeams = [...g.teams].sort((a, b) => parseInt(b.pts) - parseInt(a.pts) || parseInt(b.gd) - parseInt(a.gd));
-                    thirds.push({ ...sortedTeams[2], groupOrigin: g.group || g.name || '—' });
+                    let thirdTeam;
+                    if (isSim) {
+                        // En simulación, el array ya viene perfectamente ordenado con las reglas FIFA por calculateSimulatedStandings
+                        thirdTeam = g.teams[2];
+                    } else {
+                        // Para datos reales (cacheGroups), los ordenamos si la API no los entregó bien
+                        const sortedTeams = [...g.teams].sort((a, b) => {
+                            if (parseInt(b.pts || 0) !== parseInt(a.pts || 0)) return parseInt(b.pts || 0) - parseInt(a.pts || 0);
+                            
+                            let tIdA = (a.team_id || a.id || '').toString();
+                            let tIdB = (b.team_id || b.id || '').toString();
+                            let aVsB = (window.globalH2HPoints && window.globalH2HPoints[`${tIdA}_${tIdB}`]) ? window.globalH2HPoints[`${tIdA}_${tIdB}`] : 0;
+                            let bVsA = (window.globalH2HPoints && window.globalH2HPoints[`${tIdB}_${tIdA}`]) ? window.globalH2HPoints[`${tIdB}_${tIdA}`] : 0;
+                            if (bVsA !== aVsB) return bVsA - aVsB;
+
+                            if (parseInt(b.gd || 0) !== parseInt(a.gd || 0)) return parseInt(b.gd || 0) - parseInt(a.gd || 0);
+                            return parseInt(b.gf || 0) - parseInt(a.gf || 0);
+                        });
+                        thirdTeam = sortedTeams[2];
+                    }
+                    thirds.push({ ...thirdTeam, groupOrigin: g.group || g.name || '—' });
                 }
             });
 
