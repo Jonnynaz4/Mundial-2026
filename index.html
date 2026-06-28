@@ -1355,7 +1355,6 @@
             let tally = {};
             let matches = window.globalMatchesData || [];
             matches.forEach(m => {
-                if (String(m.finished).toUpperCase() !== 'TRUE') return;
                 let hs = m.home_scorers && m.home_scorers !== "null" ? m.home_scorers.split(',') : [];
                 let as = m.away_scorers && m.away_scorers !== "null" ? m.away_scorers.split(',') : [];
 
@@ -1363,14 +1362,58 @@
                 let processScorerArray = (arr, tId) => {
                     arr.forEach(str => {
                         let text = str.replace(/\(pen\)/ig, '').trim();
-                        let namePart = text.replace(/[\d\+']+/g, '').replace(/[(){}\"]/g, '').trim();
+                        // Remover números, signos +, comillas simples y dobles (normales y tipográficas), y paréntesis
+                        let namePart = text.replace(/[\d\+']+/g, '').replace(/[(){}\"“”«»]/g, '').trim();
 
                         const aliases = {
                             'K. Mbappé': 'Kylian Mbappé',
                             'K. Mbappe': 'Kylian Mbappé',
                             'L. Messi': 'Lionel Messi',
                             'C. Ronaldo': 'Cristiano Ronaldo',
-                            'E. Haaland': 'Erling Haaland'
+                            'E. Haaland': 'Erling Haaland',
+                            'J. Quiñones': 'Julián Quiñones',
+                            'R. Jiménez': 'Raúl Jiménez',
+                            'Kvdi Khakpv': 'Cody Gakpo',
+                            'Dniz Avndav': 'Deniz Undav',
+                            'Dnil Mvnvz': 'Daniel Muñoz',
+                            'Paph Gviih': 'Pape Gueye',
+                            'Nikvlas Ph Ph': 'Nicolas Pépé',
+                            'Aiash Ivida': 'Ayase Ueda',
+                            'Asmaail Saibari': 'Ismael Saibari',
+                            'Abas Bk Fiz Allh Af': 'Abbosbek Fayzullaev',
+                            'Y.Ayari': 'Yasin Ayari',
+                            'F. Balogun': 'Folarin Balogun',
+                            'Jvd Blingham': 'Jude Bellingham',
+                            'J. Bellingham': 'Jude Bellingham',
+                            'H. Kane': 'Harry Kane',
+                            'Hri Kin': 'Harry Kane',
+                            'C. Larin': 'Cyle Larin',
+                            'Kail Larin': 'Cyle Larin',
+                            'Lviiz Diaz': 'Luis Díaz',
+                            'Jvlian Kviinvnz': 'Julián Quiñones',
+                            'Jivani Lv Slsv': 'Giovani Lo Celso',
+                            'Mvsi Altmari': 'Musa Al-Taamari',
+                            'Kalb Iirnki': 'Caleb Ekuban',
+                            'Drik Lvkasn': 'Derrick Luckassen',
+                            'Nilsvn Angvlv': 'Nilson Angulo',
+                            'Gvnzalv Plata': 'Gonzalo Plata',
+                            'Ali Jast': 'Elijah Just',
+                            'Prvmis Divid': 'Promise David',
+                            'Astfan Avstakviv': 'Stephen Eustáquio',
+                            'Nzir Bnbvali': 'Nazir Benbouali',
+                            'Markvs Hlmgrn Pdrsn': 'Marcus Holmgren Pedersen',
+                            'Ailman Andiaih': 'Iliman Ndiaye',
+                            'Fistvn Mail': 'Fiston Mayele',
+                            'Aldvr Shvmvrvdvf': 'Eldor Shomurodov',
+                            'Taplv Maskv': 'Teboho Mokoena',
+                            'Ali Avlvan': 'Ali Olwan',
+                            'Khamintvn Kampaz': 'Jaminton Campaz',
+                            'I.B. Hwang': 'Hwang In-beom',
+                            'H.G. Oh': 'Oh Hyeon-gyu',
+                            'Baris Alpr Ailmaz': 'Barış Alper Yılmaz',
+                            'Kan Aihan': 'Kaan Ayhan',
+                            'J. McGinn': 'John McGinn',
+                            'Hassan Mohamed Altmbkti': 'Hassan Tambakti'
                         };
                         if (aliases[namePart]) namePart = aliases[namePart];
 
@@ -1389,11 +1432,11 @@
             });
 
             let list = Object.keys(tally).map(name => ({ name, goals: tally[name].goals, teamId: tally[name].teamId }));
-            list = list.filter(p => p.goals > 1);
+            list = list.filter(p => p.goals > 0);
             list.sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name));
 
             if (list.length === 0) {
-                container.innerHTML = `<div style="text-align: center; padding: 50px; grid-column: 1/-1; color: var(--text-muted);">No hay goleadores con más de 1 gol registrados aún.</div>`;
+                container.innerHTML = `<div style="text-align: center; padding: 50px; grid-column: 1/-1; color: var(--text-muted);">No hay goleadores registrados aún.</div>`;
                 return;
             }
 
@@ -1747,15 +1790,53 @@
 
             // 2. Definición estructurada de llaves (Motor de Cascada)
             let M = {};
+
+            let getRealMatchResult = (homeId, awayId) => {
+                if (!window.globalMatchesData || !homeId || !awayId) return null;
+                for (let m of window.globalMatchesData) {
+                    let mHomeId = String(m.home_team_id || m.homeTeamId || m.home_team);
+                    let mAwayId = String(m.away_team_id || m.awayTeamId || m.away_team);
+                    if ((mHomeId === String(homeId) && mAwayId === String(awayId)) || 
+                        (mHomeId === String(awayId) && mAwayId === String(homeId))) {
+                        return m;
+                    }
+                }
+                return null;
+            };
+
+            let getRealWinnerLoser = (homeObj, awayObj, wantWinner) => {
+                if (!homeObj || !awayObj) return null;
+                let m = getRealMatchResult(homeObj.id, awayObj.id);
+                if (m && String(m.finished).toUpperCase() === 'TRUE') {
+                    let hScore = parseInt(m.home_score) || 0;
+                    let aScore = parseInt(m.away_score) || 0;
+                    let hId = String(m.home_team_id || m.homeTeamId || m.home_team);
+                    let isHomeTeamHome = hId === String(homeObj.id);
+                    let homeTeamObj = isHomeTeamHome ? homeObj : awayObj;
+                    let awayTeamObj = isHomeTeamHome ? awayObj : homeObj;
+
+                    if (hScore > aScore) return wantWinner ? homeTeamObj : awayTeamObj;
+                    if (aScore > hScore) return wantWinner ? awayTeamObj : homeTeamObj;
+                    
+                    if (m.home_penalty !== undefined && m.away_penalty !== undefined) {
+                        let hPen = parseInt(m.home_penalty) || 0;
+                        let aPen = parseInt(m.away_penalty) || 0;
+                        if (hPen > aPen) return wantWinner ? homeTeamObj : awayTeamObj;
+                        if (aPen > hPen) return wantWinner ? awayTeamObj : homeTeamObj;
+                    }
+                }
+                return null;
+            };
+
             let getW = (mId) => {
-                if (!isSim) return null;
+                if (!isSim) return M[mId] ? getRealWinnerLoser(M[mId].home, M[mId].away, true) : null;
                 let w = simulatedScores[mId]?.winner;
                 if (w === 'home' && M[mId]) return M[mId].home;
                 if (w === 'away' && M[mId]) return M[mId].away;
                 return null;
             };
             let getL = (mId) => {
-                if (!isSim) return null;
+                if (!isSim) return M[mId] ? getRealWinnerLoser(M[mId].home, M[mId].away, false) : null;
                 let w = simulatedScores[mId]?.winner;
                 if (w === 'home' && M[mId]) return M[mId].away;
                 if (w === 'away' && M[mId]) return M[mId].home;
@@ -1824,6 +1905,15 @@
 
                 let hHtml = formatTeamStatic(m.home, hDesc);
                 let aHtml = formatTeamStatic(m.away, aDesc);
+                
+                let matchDateHtml = '';
+                let realMatchForDate = null;
+                if (!isSim && m.home && m.away) {
+                    realMatchForDate = getRealMatchResult(m.home.id, m.away.id);
+                    if (realMatchForDate && realMatchForDate.local_date) {
+                        matchDateHtml = `<div style="font-size: 0.65rem; color: #a855f7; margin-top: 2px; font-weight: 600;">🕒 ${realMatchForDate.local_date}</div>`;
+                    }
+                }
 
                 let content = '';
                 if (interactive) {
@@ -1835,14 +1925,43 @@
 
                     content = `<div style="display:flex; justify-content:space-between; align-items:stretch; gap:6px; width:100%;">${hBtn}<span style="color:var(--text-muted); font-size:0.7rem; display:flex; align-items:center; flex-shrink:0;">vs</span>${aBtn}</div>`;
                 } else {
+                    let realScoreInfo = `<span style="color:var(--text-muted); font-size:0.75rem; flex-shrink:0; display:flex; align-items:center;">vs</span>`;
                     let staticH = `<div style="flex:1; width:50%; display:flex; justify-content:flex-start; align-items:center;">${hHtml}</div>`;
                     let staticA = `<div style="flex:1; width:50%; display:flex; justify-content:flex-start; align-items:center;">${aHtml}</div>`;
-                    content = `<div style="display:flex; justify-content:space-between; align-items:stretch; gap:6px; width:100%; min-height:40px;">${staticH} <span style="color:var(--text-muted); font-size:0.75rem; flex-shrink:0; display:flex; align-items:center;">vs</span> ${staticA}</div>`;
+                    
+                    if (!isSim && m.home && m.away) {
+                        let realMatch = realMatchForDate || getRealMatchResult(m.home.id, m.away.id);
+                        if (realMatch && (String(realMatch.finished).toUpperCase() === 'TRUE' || (realMatch.home_score !== undefined && realMatch.home_score !== null))) {
+                            let hs = realMatch.home_score !== null ? realMatch.home_score : '-';
+                            let as = realMatch.away_score !== null ? realMatch.away_score : '-';
+                            let realHId = String(realMatch.home_team_id || realMatch.homeTeamId || realMatch.home_team);
+                            
+                            if (realHId === String(m.away.id)) {
+                                hs = realMatch.away_score !== null ? realMatch.away_score : '-';
+                                as = realMatch.home_score !== null ? realMatch.home_score : '-';
+                            }
+                            
+                            let penInfo = "";
+                            if (realMatch.home_penalty !== undefined && realMatch.away_penalty !== undefined) {
+                                let hPen = realHId === String(m.away.id) ? realMatch.away_penalty : realMatch.home_penalty;
+                                let aPen = realHId === String(m.away.id) ? realMatch.home_penalty : realMatch.away_penalty;
+                                penInfo = `<div style="font-size:0.6rem; color:var(--text-muted); text-align:center; width:100%; margin-top:-3px;">(${hPen}-${aPen})</div>`;
+                            }
+                            
+                            realScoreInfo = `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0;"><span style="font-size:0.85rem; font-weight:bold; color:#fff; background:rgba(0,0,0,0.5); padding:2px 6px; border-radius:4px;">${hs} - ${as}</span>${penInfo}</div>`;
+                            staticH = `<div style="flex:1; width:35%; display:flex; justify-content:flex-start; align-items:center;">${hHtml}</div>`;
+                            staticA = `<div style="flex:1; width:35%; display:flex; justify-content:flex-start; align-items:center;">${aHtml}</div>`;
+                        }
+                    }
+                    content = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; width:100%; min-height:40px;">${staticH} ${realScoreInfo} ${staticA}</div>`;
                 }
 
                 return `
                     <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; border-left: 3px solid ${borderColor}; display: flex; flex-direction: column; gap: 8px; min-width: 0; overflow: hidden; box-sizing: border-box;">
-                        <div style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}: ${subTitle}</div>
+                        <div style="display: flex; flex-direction: column;">
+                            <div style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}: ${subTitle}</div>
+                            ${matchDateHtml}
+                        </div>
                         ${content}
                     </div>
                 `;
