@@ -1818,9 +1818,11 @@
                     if (hScore > aScore) return wantWinner ? homeTeamObj : awayTeamObj;
                     if (aScore > hScore) return wantWinner ? awayTeamObj : homeTeamObj;
                     
-                    if (m.home_penalty !== undefined && m.away_penalty !== undefined) {
-                        let hPen = parseInt(m.home_penalty) || 0;
-                        let aPen = parseInt(m.away_penalty) || 0;
+                    let mHomePen = m.home_penalty_score !== undefined ? m.home_penalty_score : m.home_penalty;
+                    let mAwayPen = m.away_penalty_score !== undefined ? m.away_penalty_score : m.away_penalty;
+                    if (mHomePen !== undefined && mAwayPen !== undefined) {
+                        let hPen = parseInt(mHomePen) || 0;
+                        let aPen = parseInt(mAwayPen) || 0;
                         if (hPen > aPen) return wantWinner ? homeTeamObj : awayTeamObj;
                         if (aPen > hPen) return wantWinner ? awayTeamObj : homeTeamObj;
                     }
@@ -1831,6 +1833,10 @@
             let getW = (mId) => {
                 if (!isSim) return M[mId] ? getRealWinnerLoser(M[mId].home, M[mId].away, true) : null;
                 let w = simulatedScores[mId]?.winner;
+                if (!w && M[mId]) {
+                    let realW = getRealWinnerLoser(M[mId].home, M[mId].away, true);
+                    if (realW) return realW;
+                }
                 if (w === 'home' && M[mId]) return M[mId].home;
                 if (w === 'away' && M[mId]) return M[mId].away;
                 return null;
@@ -1838,6 +1844,10 @@
             let getL = (mId) => {
                 if (!isSim) return M[mId] ? getRealWinnerLoser(M[mId].home, M[mId].away, false) : null;
                 let w = simulatedScores[mId]?.winner;
+                if (!w && M[mId]) {
+                    let realL = getRealWinnerLoser(M[mId].home, M[mId].away, false);
+                    if (realL) return realL;
+                }
                 if (w === 'home' && M[mId]) return M[mId].away;
                 if (w === 'away' && M[mId]) return M[mId].home;
                 return null;
@@ -1899,6 +1909,10 @@
             let renderCard = (mId, title, subTitle, hDesc, aDesc, borderColor) => {
                 let m = M[mId] || { home: null, away: null };
                 let winner = simulatedScores[mId]?.winner;
+                if (isSim && !winner && m.home && m.away) {
+                    let realW = getRealWinnerLoser(m.home, m.away, true);
+                    if (realW) winner = (realW.id === m.home.id) ? 'home' : 'away';
+                }
 
                 let isReady = (m.home !== null && m.away !== null);
                 let interactive = isSim && isReady;
@@ -1942,9 +1956,11 @@
                             }
                             
                             let penInfo = "";
-                            if (realMatch.home_penalty !== undefined && realMatch.away_penalty !== undefined) {
-                                let hPen = realHId === String(m.away.id) ? realMatch.away_penalty : realMatch.home_penalty;
-                                let aPen = realHId === String(m.away.id) ? realMatch.home_penalty : realMatch.away_penalty;
+                            let realHomePen = realMatch.home_penalty_score !== undefined ? realMatch.home_penalty_score : realMatch.home_penalty;
+                            let realAwayPen = realMatch.away_penalty_score !== undefined ? realMatch.away_penalty_score : realMatch.away_penalty;
+                            if (realHomePen !== undefined && realAwayPen !== undefined) {
+                                let hPen = realHId === String(m.away.id) ? realAwayPen : realHomePen;
+                                let aPen = realHId === String(m.away.id) ? realHomePen : realAwayPen;
                                 penInfo = `<div style="font-size:0.6rem; color:var(--text-muted); text-align:center; width:100%; margin-top:-3px;">(${hPen}-${aPen})</div>`;
                             }
                             
