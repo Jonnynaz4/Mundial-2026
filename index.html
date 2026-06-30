@@ -807,6 +807,9 @@
             <button class="view-btn" id="btn-scorers" onclick="switchView('scorers')">
                 Goleadores
             </button>
+            <button class="view-btn" id="btn-partidos" onclick="switchView('partidos')">
+                Partidos
+            </button>
             <button class="view-btn" id="btn-sim" onclick="switchView('simulation')">
                 Simulación
             </button>
@@ -1006,6 +1009,8 @@
             document.getElementById('btn-general').classList.toggle('active', view === 'general');
             document.getElementById('btn-thirds').classList.toggle('active', view === 'thirds');
             document.getElementById('btn-scorers').classList.toggle('active', view === 'scorers');
+            const btnPartidos = document.getElementById('btn-partidos');
+            if (btnPartidos) btnPartidos.classList.toggle('active', view === 'partidos');
             const btnLive = document.getElementById('btn-live');
             if (btnLive) btnLive.classList.toggle('active', view === 'live');
             const btnSim = document.getElementById('btn-sim');
@@ -1030,6 +1035,9 @@
             } else if (currentView === 'scorers') {
                 container.classList.add('full-width');
                 renderScorersView(container);
+            } else if (currentView === 'partidos') {
+                container.classList.add('full-width');
+                renderPartidosView(container);
             } else if (currentView === 'live') {
                 container.classList.add('full-width');
                 renderLiveView(container);
@@ -1945,7 +1953,10 @@
                     
                     if (!isSim && m.home && m.away) {
                         let realMatch = realMatchForDate || getRealMatchResult(m.home.id, m.away.id);
-                        if (realMatch && (String(realMatch.finished).toUpperCase() === 'TRUE' || (realMatch.home_score !== undefined && realMatch.home_score !== null))) {
+                        let isFinished = realMatch && String(realMatch.finished).toUpperCase() === 'TRUE';
+                        let isLive = realMatch && String(realMatch.finished).toUpperCase() === 'FALSE' && realMatch.time_elapsed && realMatch.time_elapsed !== 'notstarted';
+                        let validScore = realMatch && realMatch.home_score !== undefined && realMatch.home_score !== null && String(realMatch.home_score).toLowerCase() !== 'null';
+                        if (realMatch && (isFinished || isLive) && validScore) {
                             let hs = realMatch.home_score !== null ? realMatch.home_score : '-';
                             let as = realMatch.away_score !== null ? realMatch.away_score : '-';
                             let realHId = String(realMatch.home_team_id || realMatch.homeTeamId || realMatch.home_team);
@@ -2094,6 +2105,109 @@
                 </div>
             `;
         }
+
+        function renderPartidosView(container) {
+            let allMatches = window.globalMatchesData || [];
+            let validMatches = allMatches.filter(m => m.home_team_id && m.away_team_id && String(m.home_team_id) !== "0" && String(m.away_team_id) !== "0");
+            
+            validMatches.sort((a, b) => {
+                let da = new Date(a.local_date);
+                let db = new Date(b.local_date);
+                return db - da; 
+            });
+
+            let html = `
+                <div class="group-card" style="padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+                        <h3 style="color: var(--secondary); font-size: 1.4rem; font-weight: 700;">Historial de Partidos</h3>
+                        <input type="text" id="partidos-filter" placeholder="Buscar selección..." style="padding: 10px 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.4); color: white; width: 100%; max-width: 300px; font-family: 'Outfit', sans-serif;" oninput="filterPartidos(this.value)">
+                    </div>
+                    <div class="table-wrapper" style="max-height: 600px; overflow-y: auto;">
+                        <table style="width: 100%; border-collapse: separate; border-spacing: 0 8px;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left;">Fecha</th>
+                                    <th>Fase/Grupo</th>
+                                    <th style="text-align:right;">Local</th>
+                                    <th style="text-align:center;">Resultado</th>
+                                    <th style="text-align:left;">Visitante</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            validMatches.forEach((m, idx) => {
+                let homeInfo = teamsMap.get(String(m.home_team_id)) || { name_en: m.home_team_name_en || m.home_team_id, flag: '' };
+                let awayInfo = teamsMap.get(String(m.away_team_id)) || { name_en: m.away_team_name_en || m.away_team_id, flag: '' };
+                
+                let isFinished = String(m.finished).toUpperCase() === 'TRUE';
+                let isLive = String(m.finished).toUpperCase() === 'FALSE' && m.time_elapsed && m.time_elapsed !== 'notstarted';
+                let hasValidScore = m.home_score !== undefined && m.home_score !== null && String(m.home_score).toLowerCase() !== 'null';
+                
+                let hs = hasValidScore && (isFinished || isLive) ? m.home_score : '-';
+                let as = hasValidScore && (isFinished || isLive) ? m.away_score : '-';
+                
+                let statusHtml = isFinished ? '<span style="color:var(--text-muted);">Finalizado</span>' : 
+                                (isLive ? `<span style="color: var(--danger); animation: pulse 1.5s infinite; font-weight:bold;">${m.time_elapsed}</span>` : '<span style="color:var(--text-muted); opacity:0.6;">Por Jugar</span>');
+                
+                let penInfo = "";
+                let homePen = m.home_penalty_score !== undefined ? m.home_penalty_score : m.home_penalty;
+                let awayPen = m.away_penalty_score !== undefined ? m.away_penalty_score : m.away_penalty;
+                if (homePen !== undefined && awayPen !== undefined && homePen !== null && String(homePen).toLowerCase() !== 'null') {
+                    penInfo = `<div style="font-size:0.65rem; color:var(--text-muted); margin-top:2px;">(${homePen}-${awayPen})</div>`;
+                }
+                
+                let searchTokens = `${homeInfo.name_en || ''} ${awayInfo.name_en || ''}`.toLowerCase();
+                
+                html += `
+                    <tr class="partido-row" data-search="${searchTokens}" style="animation: fadeIn 0.4s ease-out ${idx * 0.02}s both;">
+                        <td style="font-size:0.8rem; color:var(--text-muted); text-align:left;">${m.local_date || ''}</td>
+                        <td style="font-size:0.8rem; color:var(--primary); font-weight:600;">${(m.group || m.type || '').toUpperCase()}</td>
+                        <td style="text-align:right;">
+                            <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px;">
+                                <span style="font-weight:600; font-size: 0.9rem;">${homeInfo.name_en || ''}</span>
+                                <img src="${homeInfo.flag}" style="width:24px; height:16px; border-radius:3px; object-fit:cover;" onerror="this.style.display='none'">
+                            </div>
+                        </td>
+                        <td style="text-align:center;">
+                            <div style="display:flex; flex-direction:column; align-items:center;">
+                                <span style="background:rgba(255,255,255,0.08); padding:4px 10px; border-radius:6px; font-weight:800; font-size:1.05rem; letter-spacing:1px; border: 1px solid rgba(255,255,255,0.05);">${hs} - ${as}</span>
+                                ${penInfo}
+                            </div>
+                        </td>
+                        <td style="text-align:left;">
+                            <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+                                <img src="${awayInfo.flag}" style="width:24px; height:16px; border-radius:3px; object-fit:cover;" onerror="this.style.display='none'">
+                                <span style="font-weight:600; font-size: 0.9rem;">${awayInfo.name_en || ''}</span>
+                            </div>
+                        </td>
+                        <td style="font-size:0.8rem;">${statusHtml}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+        }
+
+        window.filterPartidos = function(query) {
+            let q = query.toLowerCase().trim();
+            let rows = document.querySelectorAll('.partido-row');
+            rows.forEach(r => {
+                let searchStr = r.getAttribute('data-search') || '';
+                if (searchStr.includes(q)) {
+                    r.style.display = '';
+                } else {
+                    r.style.display = 'none';
+                }
+            });
+        };
 
         window.onload = init;
     </script>
